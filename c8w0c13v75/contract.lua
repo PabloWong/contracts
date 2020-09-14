@@ -34,13 +34,14 @@ function queuepay ()
     fee_msat = 0,
     stake = 0,
     waiting = nil,
-    reserved = nil
+    reserved = nil,
+    owner = account.id
   }
 
   if offer.reserved then
     -- this prevents random people to harm onchain transactors by changing the
     -- amounts while they may be waiting for a confirmation
-    error("offer for " .. addr .. " is reserved")
+    error("offer for " .. adstdr .. " is reserved")
   end
 
   offer.sat = offer.sat + sat
@@ -53,6 +54,23 @@ function queuepay ()
   contract.state[addr] = offer
 end
 
+
+--if offer was made by a signed account then it can be revoked
+function revoke () 
+	local addr = call.payload.addr
+	local offer = contract.state[addr]
+	if 	amount <= 0 or 
+			not btcaddress or 
+			not account.id or
+			not offer or 
+			not offer.reserved or
+			offer.owner ~=account.id then
+		error("nil")
+	end
+  contract.send(offer.owner, sat)
+end
+		
+
 function reserve ()
   if not account.id then
     error('must be authenticated!')
@@ -60,7 +78,7 @@ function reserve ()
 
   bump()
 
-  local stake_needed = 0
+  local stakestake_needed = 0
 
   for _, addr in ipairs(call.payload.addresses) do
     local offer = contract.state[addr]
