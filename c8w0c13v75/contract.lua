@@ -15,9 +15,9 @@ function queuepay ()
   end
 
   local addr = call.payload.addr
-  local fee_msat = tonumber(call.payload.fee_msat)
+  local fee_msat = tonumber(call.payload.fee_msat or 0)
   local sat = math.floor((call.msatoshi - fee_msat) / 1000)
-
+  
   if sat < 0 then
     error("sats to destination can't be negative")
   end
@@ -27,16 +27,22 @@ function queuepay ()
   -- if amount paid contains msatoshi not specified in fees, add these to the fees
   local extra_msat = call.msatoshi - (sat * 1000 + fee_msat)
   fee_msat = fee_msat + extra_msat
-
+  
+  owner=false
+  if account.id then
+    owner=account.id
+  end
+  
   local offer = contract.state[addr] or {
     block = 0,
     sat = 0,
     fee_msat = 0,
     stake = 0,
     waiting = nil,
-    reserved = nil
+    reserved = nil,
+    owner = owner
   }
-
+  
   if offer.reserved then
     -- this prevents random people to harm onchain transactors by changing the
     -- amounts while they may be waiting for a confirmation
@@ -52,7 +58,20 @@ function queuepay ()
 
   contract.state[addr] = offer
 end
-
+function revoke () 
+	local addr = call.payload.addr
+	local offer = contract.state[addr]
+	if not addr or
+    not account.id or
+		not offer or 
+    offer.reserved or
+    offer.owner ~=account.id
+  then
+		error("nil")
+	end
+  contract.send(offer.owner, offer.sat * 1000 + offer.fee_msat)
+	contract.state[addr]=nil
+end
 function reserve ()
   if not account.id then
     error('must be authenticated!')
